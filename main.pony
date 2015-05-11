@@ -4,10 +4,13 @@ actor Main
   new create(env:Env) =>
     let server = Server(env)
     let c1 = Client("client1", server)
+    let c2 = Client("client2", server)
     c1.login()
     c1.post("Hi!")
-    server.print_log()
+    c2.post("Hi!")
     c1.logout()
+    c2.logout()
+    server.print_log()
 
 class Client 
   let username:String
@@ -24,7 +27,7 @@ class Client
   fun post(message:String) => server.post(username, username + ": " + message)
 
 interface LogPrinter 
-  be print(output:List[String] tag)
+  be print(message:String)
 
 actor Server 
   let storage:Storage
@@ -39,6 +42,8 @@ actor Server
   be login(username:String) =>
     try
       sessions.insert(username, Session(username, storage))
+    else
+      env.out.print("Error creating session for " + username)
     end
 
   be logout(username:String) =>
@@ -54,8 +59,8 @@ actor Server
   be print_log() =>
     storage.print(this)
 
-  be print(output:List[String] tag) =>
-    env.out.print("Output")
+  be print(message:String) =>
+    env.out.print(message)
 
 actor Session
   let username:String
@@ -77,7 +82,12 @@ actor MemoryStorage is Storage
   
   let log:List[String] = List[String]
 
-  be push(message:String) => log.push(message)
+  be push(message:String) => 
+    log.push(message)
 
   be print(printer:LogPrinter tag) =>
-    printer.print(log)
+    try
+      for message in log.values() do
+        printer.print(message)
+      end
+    end
