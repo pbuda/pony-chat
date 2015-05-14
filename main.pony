@@ -6,11 +6,13 @@ actor Main
     let c1 = Client("client1", server)
     let c2 = Client("client2", server)
     c1.login()
+    c2.login()
     c1.post("Hi!")
+    server.print_log()
     c2.post("Hi!")
+    server.print_log()
     c1.logout()
     c2.logout()
-    server.print_log()
 
 class Client 
   let username:String
@@ -26,9 +28,6 @@ class Client
 
   fun post(message:String) => server.post(username, username + ": " + message)
 
-interface LogPrinter 
-  be print(message:String)
-
 actor Server 
   let storage:Storage
   let sessions:Map[String, Session]
@@ -36,7 +35,7 @@ actor Server
 
   new create(env':Env) =>
     env = env'
-    storage = MemoryStorage
+    storage = MemoryStorage(env)
     sessions = Map[String, Session]
 
   be login(username:String) =>
@@ -53,7 +52,9 @@ actor Server
 
   be post(from:String, message:String) =>
     try
-      sessions(from).post(from, message)
+      sessions(from).post(message)
+    else
+      env.out.print("Could not find session for " + from)
     end
 
   be print_log() =>
@@ -70,8 +71,11 @@ actor Session
     username = username'
     storage = storage'
 
-  be post(from:String, message:String) =>
+  be post(message:String) =>
     storage.push(message)
+
+interface LogPrinter 
+  be print(message:String)
 
 trait Storage tag
   be push(message:String)
@@ -79,13 +83,19 @@ trait Storage tag
   be print(printer:LogPrinter tag)
 
 actor MemoryStorage is Storage 
+  let _env:Env
   
   let log:List[String] = List[String]
 
+  new create(env:Env) =>
+    _env = env
+
   be push(message:String) => 
+    _env.out.print("Pushing message: " + message)
     log.push(message)
 
   be print(printer:LogPrinter tag) =>
+    _env.out.print("Printing log")
     try
       for message in log.values() do
         printer.print(message)
